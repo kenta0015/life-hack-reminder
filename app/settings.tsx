@@ -28,7 +28,7 @@ export default function SettingsScreen() {
       ]}
     >
       <View style={styles.nav}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/")} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={C.ink} />
         </Pressable>
         <Text style={styles.navTitle}>設定</Text>

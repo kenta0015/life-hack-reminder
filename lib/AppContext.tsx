@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
 import type {
@@ -38,28 +39,28 @@ interface AppContextValue {
   addItem: (
     type: ItemType,
     content: LifeCardContent | NudgeContent | PlaybookContent
-  ) => ActiveItem;
+  ) => Promise<ActiveItem>;
   updateItem: (
     id: string,
     content: LifeCardContent | NudgeContent | PlaybookContent
-  ) => void;
-  deleteItem: (id: string) => void;
-  permanentDelete: (id: string) => void;
-  restoreItem: (id: string) => ActiveItem | null;
+  ) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
+  permanentDelete: (id: string) => Promise<void>;
+  restoreItem: (id: string) => Promise<ActiveItem | null>;
   replaceAndAdd: (
     oldId: string,
     type: ItemType,
     content: LifeCardContent | NudgeContent | PlaybookContent
-  ) => ActiveItem;
-  replaceAndRestore: (oldId: string, restoreId: string) => ActiveItem | null;
-  simulateDelivery: () => {
+  ) => Promise<ActiveItem>;
+  replaceAndRestore: (oldId: string, restoreId: string) => Promise<ActiveItem | null>;
+  simulateDelivery: () => Promise<{
     item: ActiveItem | null;
     delivery: DeliveryRecord | null;
-  };
+  }>;
   recordFeedback: (
     deliveryId: string,
     feedback: "YES" | "NO" | "SKIP"
-  ) => { shouldPromptDelete: boolean };
+  ) => Promise<{ shouldPromptDelete: boolean }>;
   getLastDelivery: () => {
     item: ActiveItem | null;
     delivery: DeliveryRecord | null;
@@ -75,19 +76,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deliveries: [],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const latestStateRef = useRef<AppState>(state);
+
+  useEffect(() => {
+    latestStateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     loadState().then((s) => {
       const cleaned = cleanDeleteBox(s);
       setState(cleaned);
+      latestStateRef.current = cleaned;
       setIsLoading(false);
       saveState(cleaned);
     });
   }, []);
 
-  const persist = useCallback((newState: AppState) => {
-    setState(newState);
-    saveState(newState);
+  const updateAndSave = useCallback(async (updater: (prev: AppState) => AppState): Promise<AppState> => {
+    const cur = latestStateRef.current;
+    const next = updater(cur);
+    latestStateRef.current = next;
+    setState(next);
+    await saveState(next);
+    return next;
   }, []);
 
   function cleanDeleteBox(s: AppState): AppState {
@@ -99,236 +110,229 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const addItem = useCallback(
-    (
+    async (
       type: ItemType,
       content: LifeCardContent | NudgeContent | PlaybookContent
-    ): ActiveItem => {
+    ): Promise<ActiveItem> => {
       const newItem: ActiveItem = {
         id: generateId(),
         type,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        stats: {
-          yesCount: 0,
-          noCount: 0,
-          skipCount: 0,
-          displayCount: 0,
-        },
+        stats: { yesCount: 0, noCount: 0, skipCount: 0, displayCount: 0 },
         content,
       };
-      const newState = {
-        ...state,
-        activeItems: [...state.activeItems, newItem],
-      };
-      persist(newState);
+      await updateAndSave((prev) => ({
+        ...prev,
+        activeItems: [...prev.activeItems, newItem],
+      }));
       return newItem;
     },
-    [state, persist]
+    [updateAndSave]
   );
 
   const updateItem = useCallback(
-    (
-      id: string,
-      content: LifeCardContent | NudgeContent | PlaybookContent
-    ) => {
-      const newItems = state.activeItems.map((it) =>
-        it.id === id ? { ...it, content, updatedAt: Date.now() } : it
-      );
-      persist({ ...state, activeItems: newItems });
+    async (id: string, content: LifeCardContent | NudgeContent | PlaybookContent) => {
+      await updateAndSave((prev) => ({
+        ...prev,
+        activeItems: prev.activeItems.map((it) =>
+          it.id === id ? { ...it, content, updatedAt: Date.now() } : it
+        ),
+      }));
     },
-    [state, persist]
+    [updateAndSave]
   );
 
   const deleteItem = useCallback(
-    (id: string) => {
-      const item = state.activeItems.find((it) => it.id === id);
-      if (!item) return;
-      const deletedItem: DeleteBoxItem = { ...item, deletedAt: Date.now() };
-      const newState = {
-        ...state,
-        activeItems: state.activeItems.filter((it) => it.id !== id),
-        deleteBox: [...state.deleteBox, deletedItem],
-      };
-      persist(newState);
+    async (id: string) => {
+      await updateAndSave((prev) => {
+        const item = prev.activeItems.find((it) => it.id === id);
+        if (!item) return prev;
+        return {
+          ...prev,
+          activeItems: prev.activeItems.filter((it) => it.id !== id),
+          deleteBox: [...prev.deleteBox, { ...item, deletedAt: Date.now() }],
+        };
+      });
     },
-    [state, persist]
+    [updateAndSave]
   );
 
   const permanentDelete = useCallback(
-    (id: string) => {
-      persist({
-        ...state,
-        deleteBox: state.deleteBox.filter((it) => it.id !== id),
-      });
+    async (id: string) => {
+      await updateAndSave((prev) => ({
+        ...prev,
+        deleteBox: prev.deleteBox.filter((it) => it.id !== id),
+      }));
     },
-    [state, persist]
+    [updateAndSave]
   );
 
   const restoreItem = useCallback(
-    (id: string): ActiveItem | null => {
-      const item = state.deleteBox.find((it) => it.id === id);
-      if (!item) return null;
-      const { deletedAt, ...restored } = item;
-      const restoredItem: ActiveItem = { ...restored, updatedAt: Date.now() };
-      const newState = {
-        ...state,
-        activeItems: [...state.activeItems, restoredItem],
-        deleteBox: state.deleteBox.filter((it) => it.id !== id),
-      };
-      persist(newState);
+    async (id: string): Promise<ActiveItem | null> => {
+      let restoredItem: ActiveItem | null = null;
+      await updateAndSave((prev) => {
+        const item = prev.deleteBox.find((it) => it.id === id);
+        if (!item) return prev;
+        const { deletedAt, ...restored } = item;
+        restoredItem = { ...restored, updatedAt: Date.now() };
+        return {
+          ...prev,
+          activeItems: [...prev.activeItems, restoredItem!],
+          deleteBox: prev.deleteBox.filter((it) => it.id !== id),
+        };
+      });
       return restoredItem;
     },
-    [state, persist]
+    [updateAndSave]
   );
 
   const replaceAndAdd = useCallback(
-    (
+    async (
       oldId: string,
       type: ItemType,
       content: LifeCardContent | NudgeContent | PlaybookContent
-    ): ActiveItem => {
-      const oldItem = state.activeItems.find((it) => it.id === oldId);
-      let newDeleteBox = [...state.deleteBox];
-      if (oldItem) {
-        newDeleteBox.push({ ...oldItem, deletedAt: Date.now() });
-      }
+    ): Promise<ActiveItem> => {
       const newItem: ActiveItem = {
         id: generateId(),
         type,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        stats: {
-          yesCount: 0,
-          noCount: 0,
-          skipCount: 0,
-          displayCount: 0,
-        },
+        stats: { yesCount: 0, noCount: 0, skipCount: 0, displayCount: 0 },
         content,
       };
-      const newActive = state.activeItems
-        .filter((it) => it.id !== oldId)
-        .concat(newItem);
-      persist({
-        ...state,
-        activeItems: newActive,
-        deleteBox: newDeleteBox,
+      await updateAndSave((prev) => {
+        const oldItem = prev.activeItems.find((it) => it.id === oldId);
+        const newDeleteBox = oldItem
+          ? [...prev.deleteBox, { ...oldItem, deletedAt: Date.now() }]
+          : [...prev.deleteBox];
+        return {
+          ...prev,
+          activeItems: prev.activeItems.filter((it) => it.id !== oldId).concat(newItem),
+          deleteBox: newDeleteBox,
+        };
       });
       return newItem;
     },
-    [state, persist]
+    [updateAndSave]
   );
 
   const replaceAndRestore = useCallback(
-    (oldId: string, restoreId: string): ActiveItem | null => {
-      const oldItem = state.activeItems.find((it) => it.id === oldId);
-      const restoreItem_ = state.deleteBox.find((it) => it.id === restoreId);
-      if (!restoreItem_) return null;
+    async (oldId: string, restoreId: string): Promise<ActiveItem | null> => {
+      let restoredItem: ActiveItem | null = null;
+      await updateAndSave((prev) => {
+        const oldItem = prev.activeItems.find((it) => it.id === oldId);
+        const restoreItem_ = prev.deleteBox.find((it) => it.id === restoreId);
+        if (!restoreItem_) return prev;
 
-      let newDeleteBox = state.deleteBox.filter((it) => it.id !== restoreId);
-      if (oldItem) {
-        newDeleteBox.push({ ...oldItem, deletedAt: Date.now() });
-      }
-
-      const { deletedAt, ...restored } = restoreItem_;
-      const restoredItem: ActiveItem = { ...restored, updatedAt: Date.now() };
-
-      const newActive = state.activeItems
-        .filter((it) => it.id !== oldId)
-        .concat(restoredItem);
-
-      persist({
-        ...state,
-        activeItems: newActive,
-        deleteBox: newDeleteBox,
+        let newDeleteBox = prev.deleteBox.filter((it) => it.id !== restoreId);
+        if (oldItem) {
+          newDeleteBox.push({ ...oldItem, deletedAt: Date.now() });
+        }
+        const { deletedAt, ...restored } = restoreItem_;
+        restoredItem = { ...restored, updatedAt: Date.now() };
+        return {
+          ...prev,
+          activeItems: prev.activeItems.filter((it) => it.id !== oldId).concat(restoredItem!),
+          deleteBox: newDeleteBox,
+        };
       });
       return restoredItem;
     },
-    [state, persist]
+    [updateAndSave]
   );
 
-  const simulateDelivery = useCallback(() => {
-    const item = selectNextItem(state.activeItems);
-    if (!item) return { item: null, delivery: null };
+  const simulateDelivery = useCallback(async () => {
+    let resultItem: ActiveItem | null = null;
+    let resultDelivery: DeliveryRecord | null = null;
 
-    const newDisplayCount = item.stats.displayCount + 1;
-    const askFeedback = shouldAskFeedback(newDisplayCount);
-    const delivery = createDeliveryRecord(item.id, askFeedback);
+    await updateAndSave((prev) => {
+      const item = selectNextItem(prev.activeItems);
+      if (!item) return prev;
 
-    const updatedItems = state.activeItems.map((it) =>
-      it.id === item.id
-        ? {
-            ...it,
-            stats: {
-              ...it.stats,
-              displayCount: newDisplayCount,
-              lastDeliveredAt: delivery.deliveredAt,
-            },
-          }
-        : it
-    );
+      const newDisplayCount = item.stats.displayCount + 1;
+      const askFeedback = shouldAskFeedback(newDisplayCount);
+      const delivery = createDeliveryRecord(item.id, askFeedback);
 
-    const updatedItem = updatedItems.find((it) => it.id === item.id)!;
-
-    const newState = {
-      ...state,
-      activeItems: updatedItems,
-      deliveries: [...state.deliveries, delivery],
-      lastDeliveredItemId: item.id,
-      lastDeliveryId: delivery.id,
-    };
-    persist(newState);
-    return { item: updatedItem, delivery };
-  }, [state, persist]);
-
-  const recordFeedback = useCallback(
-    (
-      deliveryId: string,
-      feedback: "YES" | "NO" | "SKIP"
-    ): { shouldPromptDelete: boolean } => {
-      const delivery = state.deliveries.find((d) => d.id === deliveryId);
-      if (!delivery) return { shouldPromptDelete: false };
-
-      const newDeliveries = state.deliveries.map((d) =>
-        d.id === deliveryId ? { ...d, feedbackGiven: feedback } : d
+      const updatedItems = prev.activeItems.map((it) =>
+        it.id === item.id
+          ? {
+              ...it,
+              stats: {
+                ...it.stats,
+                displayCount: newDisplayCount,
+                lastDeliveredAt: delivery.deliveredAt,
+              },
+            }
+          : it
       );
 
+      resultItem = updatedItems.find((it) => it.id === item.id)!;
+      resultDelivery = delivery;
+
+      return {
+        ...prev,
+        activeItems: updatedItems,
+        deliveries: [...prev.deliveries, delivery],
+        lastDeliveredItemId: item.id,
+        lastDeliveryId: delivery.id,
+      };
+    });
+
+    return { item: resultItem, delivery: resultDelivery };
+  }, [updateAndSave]);
+
+  const recordFeedback = useCallback(
+    async (
+      deliveryId: string,
+      feedback: "YES" | "NO" | "SKIP"
+    ): Promise<{ shouldPromptDelete: boolean }> => {
       let shouldPromptDelete = false;
-      const newItems = state.activeItems.map((it) => {
-        if (it.id !== delivery.itemId) return it;
-        const stats = { ...it.stats };
-        if (feedback === "YES") {
-          stats.yesCount++;
-          if (stats.noCount > 0) stats.noCount--;
-        } else if (feedback === "NO") {
-          stats.noCount++;
-          if (stats.noCount >= 5) shouldPromptDelete = true;
-        } else {
-          stats.skipCount++;
-        }
-        return { ...it, stats };
+
+      await updateAndSave((prev) => {
+        const delivery = prev.deliveries.find((d) => d.id === deliveryId);
+        if (!delivery) return prev;
+
+        const newDeliveries = prev.deliveries.map((d) =>
+          d.id === deliveryId ? { ...d, feedbackGiven: feedback } : d
+        );
+
+        const newItems = prev.activeItems.map((it) => {
+          if (it.id !== delivery.itemId) return it;
+          const stats = { ...it.stats };
+          if (feedback === "YES") {
+            stats.yesCount++;
+            if (stats.noCount > 0) stats.noCount--;
+          } else if (feedback === "NO") {
+            stats.noCount++;
+            if (stats.noCount >= 5) shouldPromptDelete = true;
+          } else {
+            stats.skipCount++;
+          }
+          return { ...it, stats };
+        });
+
+        return {
+          ...prev,
+          activeItems: newItems,
+          deliveries: newDeliveries,
+        };
       });
 
-      persist({
-        ...state,
-        activeItems: newItems,
-        deliveries: newDeliveries,
-      });
       return { shouldPromptDelete };
     },
-    [state, persist]
+    [updateAndSave]
   );
 
   const getLastDelivery = useCallback(() => {
-    if (!state.lastDeliveryId || !state.lastDeliveredItemId) {
+    const cur = latestStateRef.current;
+    if (!cur.lastDeliveryId || !cur.lastDeliveredItemId) {
       return { item: null, delivery: null };
     }
-    const delivery =
-      state.deliveries.find((d) => d.id === state.lastDeliveryId) || null;
-    const item =
-      state.activeItems.find((it) => it.id === state.lastDeliveredItemId) ||
-      null;
+    const delivery = cur.deliveries.find((d) => d.id === cur.lastDeliveryId) || null;
+    const item = cur.activeItems.find((it) => it.id === cur.lastDeliveredItemId) || null;
     return { item, delivery };
-  }, [state]);
+  }, []);
 
   const value = useMemo(
     () => ({

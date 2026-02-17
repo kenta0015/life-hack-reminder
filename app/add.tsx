@@ -53,7 +53,7 @@ export default function AddScreen() {
     return false;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!isValid()) return;
 
     let content: LifeCardContent | NudgeContent | PlaybookContent;
@@ -74,14 +74,18 @@ export default function AddScreen() {
     }
 
     if (params.replaceId) {
-      replaceAndAdd(params.replaceId, selectedType, content);
+      await replaceAndAdd(params.replaceId, selectedType, content);
     } else if (activeItems.length >= 10) {
       Alert.alert("上限", "現存アイテムが10個です。先に入れ替え先を選んでください。");
       return;
     } else {
-      addItem(selectedType, content);
+      await addItem(selectedType, content);
     }
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/");
+    }
   };
 
   return (
@@ -99,7 +103,7 @@ export default function AddScreen() {
         ]}
       >
         <View style={styles.nav}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/")} hitSlop={12}>
             <Ionicons name="arrow-back" size={24} color={C.ink} />
           </Pressable>
           <Text style={styles.navTitle}>新規追加</Text>

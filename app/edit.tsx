@@ -75,7 +75,7 @@ export default function EditScreen() {
     return false;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!isValid()) return;
     let content: LifeCardContent | NudgeContent | PlaybookContent;
     if (item.type === "lifeCard") {
@@ -92,15 +92,17 @@ export default function EditScreen() {
         steps: steps.filter((s) => s.trim().length > 0),
       } as PlaybookContent;
     }
-    updateItem(item.id, content);
-    router.back();
+    await updateItem(item.id, content);
+    if (router.canGoBack()) router.back();
+    else router.replace("/");
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (Platform.OS === "web") {
       if (confirm("このアイテムを削除ボックスに移動しますか？")) {
-        deleteItem(item.id);
-        router.back();
+        await deleteItem(item.id);
+        if (router.canGoBack()) router.back();
+        else router.replace("/");
       }
     } else {
       Alert.alert("削除", "このアイテムを削除ボックスに移動しますか？", [
@@ -108,9 +110,10 @@ export default function EditScreen() {
         {
           text: "削除する",
           style: "destructive",
-          onPress: () => {
-            deleteItem(item.id);
-            router.back();
+          onPress: async () => {
+            await deleteItem(item.id);
+            if (router.canGoBack()) router.back();
+            else router.replace("/");
           },
         },
       ]);
@@ -132,7 +135,7 @@ export default function EditScreen() {
         ]}
       >
         <View style={styles.nav}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/")} hitSlop={12}>
             <Ionicons name="arrow-back" size={24} color={C.ink} />
           </Pressable>
           <Text style={styles.navTitle}>

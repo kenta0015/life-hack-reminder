@@ -75,10 +75,10 @@ export default function DeleteBoxScreen() {
     }
   };
 
-  const handlePermanentDelete = (itemId: string) => {
+  const handlePermanentDelete = async (itemId: string) => {
     if (Platform.OS === "web") {
       if (confirm("完全に削除しますか？この操作は取り消せません。")) {
-        permanentDelete(itemId);
+        await permanentDelete(itemId);
       }
     } else {
       Alert.alert("完全削除", "この操作は取り消せません。", [
@@ -103,7 +103,7 @@ export default function DeleteBoxScreen() {
       ]}
     >
       <View style={styles.nav}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/")} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={C.ink} />
         </Pressable>
         <Text style={styles.navTitle}>削除ボックス</Text>

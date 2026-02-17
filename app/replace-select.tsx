@@ -27,12 +27,13 @@ export default function ReplaceSelectScreen() {
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
-  const handleSelect = (oldId: string) => {
+  const handleSelect = async (oldId: string) => {
     if (mode === "addNew") {
       router.replace({ pathname: "/add", params: { replaceId: oldId } });
     } else if (mode === "restore" && restoreId) {
-      replaceAndRestore(oldId, restoreId);
-      router.back();
+      await replaceAndRestore(oldId, restoreId);
+      if (router.canGoBack()) router.back();
+      else router.replace("/");
     }
   };
 
@@ -81,7 +82,7 @@ export default function ReplaceSelectScreen() {
       ]}
     >
       <View style={styles.nav}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/")} hitSlop={12}>
           <Ionicons name="close" size={24} color={C.ink} />
         </Pressable>
         <Text style={styles.navTitle}>入れ替え先を選択</Text>

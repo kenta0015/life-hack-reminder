@@ -47,7 +47,7 @@ export default function DoomScreen() {
           colors={[C.ink, C.deepNavy]}
           style={StyleSheet.absoluteFill}
         />
-        <Pressable style={styles.closeBtn} onPress={() => router.back()}>
+        <Pressable style={styles.closeBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/")}>
           <Ionicons name="close" size={28} color="#fff" />
         </Pressable>
         <Text style={styles.noItemText}>配信アイテムがありません</Text>
@@ -58,15 +58,16 @@ export default function DoomScreen() {
   const showFeedback =
     delivery.feedbackAsked && !delivery.feedbackGiven && !feedbackGiven;
 
-  const handleFeedback = (feedback: "YES" | "NO" | "SKIP") => {
-    const result = recordFeedback(delivery.id, feedback);
+  const handleFeedback = async (feedback: "YES" | "NO" | "SKIP") => {
+    const result = await recordFeedback(delivery.id, feedback);
     setFeedbackGiven(true);
 
     if (feedback === "NO" && result.shouldPromptDelete) {
       if (Platform.OS === "web") {
         if (confirm("NOが5回になりました。このアイテムを削除しますか？")) {
-          deleteItem(item.id);
-          router.back();
+          await deleteItem(item.id);
+          if (router.canGoBack()) router.back();
+          else router.replace("/");
         }
       } else {
         Alert.alert(
@@ -80,9 +81,10 @@ export default function DoomScreen() {
             {
               text: "削除する",
               style: "destructive",
-              onPress: () => {
-                deleteItem(item.id);
-                router.back();
+              onPress: async () => {
+                await deleteItem(item.id);
+                if (router.canGoBack()) router.back();
+                else router.replace("/");
               },
             },
           ]
@@ -115,7 +117,7 @@ export default function DoomScreen() {
       >
         <Pressable
           style={styles.closeBtn}
-          onPress={() => router.back()}
+          onPress={() => router.canGoBack() ? router.back() : router.replace("/")}
           hitSlop={12}
         >
           <Ionicons name="close" size={28} color="rgba(255,255,255,0.8)" />

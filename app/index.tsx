@@ -75,8 +75,8 @@ export default function HomeScreen() {
   const { activeItems, isLoading, simulateDelivery, getLastDelivery } =
     useApp();
 
-  const handleSimulate = () => {
-    const { item, delivery } = simulateDelivery();
+  const handleSimulate = async () => {
+    const { item, delivery } = await simulateDelivery();
     if (item && delivery) {
       router.push({
         pathname: "/doom",
@@ -176,28 +176,33 @@ export default function HomeScreen() {
         <Pressable
           style={styles.bottomBtn}
           onPress={() => router.push("/delete-box")}
+          testID="delete-box-btn"
         >
           <Ionicons name="trash-outline" size={22} color={C.textSecondary} />
           <Text style={styles.bottomBtnText}>削除BOX</Text>
         </Pressable>
-        <Pressable
-          style={styles.addButton}
-          onPress={() => {
-            if (activeItems.length >= 10) {
-              router.push({
-                pathname: "/replace-select",
-                params: { mode: "addNew" },
-              });
-            } else {
-              router.push("/add");
-            }
-          }}
-        >
-          <Ionicons name="add" size={28} color="#fff" />
-        </Pressable>
+        <View style={styles.addButtonWrap}>
+          <Pressable
+            style={styles.addButton}
+            onPress={() => {
+              if (activeItems.length >= 10) {
+                router.push({
+                  pathname: "/replace-select",
+                  params: { mode: "addNew" },
+                });
+              } else {
+                router.push("/add");
+              }
+            }}
+            testID="add-btn"
+          >
+            <Ionicons name="add" size={28} color="#fff" />
+          </Pressable>
+        </View>
         <Pressable
           style={styles.bottomBtn}
           onPress={() => router.push("/settings")}
+          testID="settings-btn"
         >
           <Ionicons name="settings-outline" size={22} color={C.textSecondary} />
           <Text style={styles.bottomBtnText}>設定</Text>
@@ -368,6 +373,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "NotoSansJP_400Regular",
     color: C.textSecondary,
+  },
+  addButtonWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
   addButton: {
     width: 56,
