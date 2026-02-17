@@ -23,7 +23,7 @@ const C = Colors.light;
 export default function DoomScreen() {
   const insets = useSafeAreaInsets();
   const { deliveryId } = useLocalSearchParams<{ deliveryId: string }>();
-  const { activeItems, deliveries, recordFeedback, deleteItem } = useApp();
+  const { activeItems, deliveries, recordFeedback, deleteItem, reduceNoCount } = useApp();
   const [feedbackGiven, setFeedbackGiven] = useState(false);
 
   const delivery = useMemo(
@@ -68,6 +68,8 @@ export default function DoomScreen() {
           await deleteItem(item.id);
           if (router.canGoBack()) router.back();
           else router.replace("/");
+        } else {
+          await reduceNoCount(item.id);
         }
       } else {
         Alert.alert(
@@ -77,6 +79,9 @@ export default function DoomScreen() {
             {
               text: "削除しない",
               style: "cancel",
+              onPress: async () => {
+                await reduceNoCount(item.id);
+              },
             },
             {
               text: "削除する",

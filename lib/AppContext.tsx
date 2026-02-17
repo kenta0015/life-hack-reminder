@@ -61,6 +61,7 @@ interface AppContextValue {
     deliveryId: string,
     feedback: "YES" | "NO" | "SKIP"
   ) => Promise<{ shouldPromptDelete: boolean }>;
+  reduceNoCount: (itemId: string) => Promise<void>;
   getLastDelivery: () => {
     item: ActiveItem | null;
     delivery: DeliveryRecord | null;
@@ -95,10 +96,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateAndSave = useCallback(async (updater: (prev: AppState) => AppState): Promise<AppState> => {
     const cur = latestStateRef.current;
     const next = updater(cur);
-    latestStateRef.current = next;
-    setState(next);
-    await saveState(next);
-    return next;
+    const nextCleaned = cleanDeleteBox(next);
+    latestStateRef.current = nextCleaned;
+    setState(nextCleaned);
+    await saveState(nextCleaned);
+    return nextCleaned;
   }, []);
 
   function cleanDeleteBox(s: AppState): AppState {
@@ -174,8 +176,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await updateAndSave((prev) => {
         const item = prev.deleteBox.find((it) => it.id === id);
         if (!item) return prev;
-        const { deletedAt, ...restored } = item;
-        restoredItem = { ...restored, updatedAt: Date.now() };
+        const { deletedAt, ...rest } = item;
+        restoredItem = {
+          ...rest,
+          updatedAt: Date.now(),
+          stats: { yesCount: 0, noCount: 0, skipCount: 0, displayCount: 0 },
+        };
         return {
           ...prev,
           activeItems: [...prev.activeItems, restoredItem!],
@@ -229,8 +235,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (oldItem) {
           newDeleteBox.push({ ...oldItem, deletedAt: Date.now() });
         }
-        const { deletedAt, ...restored } = restoreItem_;
-        restoredItem = { ...restored, updatedAt: Date.now() };
+        const { deletedAt, ...rest } = restoreItem_;
+        restoredItem = {
+          ...rest,
+          updatedAt: Date.now(),
+          stats: { yesCount: 0, noCount: 0, skipCount: 0, displayCount: 0 },
+        };
         return {
           ...prev,
           activeItems: prev.activeItems.filter((it) => it.id !== oldId).concat(restoredItem!),
@@ -324,6 +334,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [updateAndSave]
   );
 
+  const reduceNoCount = useCallback(async (itemId: string) => {
+    await updateAndSave((prev) => ({
+      ...prev,
+      activeItems: prev.activeItems.map((it) =>
+        it.id === itemId
+          ? {
+              ...it,
+              stats: {
+                ...it.stats,
+                noCount: Math.max(0, it.stats.noCount - 1),
+              },
+            }
+          : it
+      ),
+    }));
+  }, [updateAndSave]);
+
   const getLastDelivery = useCallback(() => {
     const cur = latestStateRef.current;
     if (!cur.lastDeliveryId || !cur.lastDeliveredItemId) {
@@ -351,6 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       replaceAndRestore,
       simulateDelivery,
       recordFeedback,
+      reduceNoCount,
       getLastDelivery,
     }),
     [
@@ -365,6 +393,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       replaceAndRestore,
       simulateDelivery,
       recordFeedback,
+      reduceNoCount,
       getLastDelivery,
     ]
   );
