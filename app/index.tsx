@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,20 +7,29 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons, Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useApp } from "@/lib/AppContext";
-import { getItemMainText, getTypeLabel } from "@/lib/types";
+import { getItemMainText, getTypeLabel, getItemTags, getItemImageUrl } from "@/lib/types";
 import { getCooldownInfo } from "@/lib/delivery";
 import type { ActiveItem } from "@/lib/types";
 import Colors from "@/constants/colors";
 
 const C = Colors.light;
 
+const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  lifeCard: "heart",
+  nudge: "chatbubble-ellipses",
+  playbook: "list",
+};
+
 function ItemCard({ item, onPress }: { item: ActiveItem; onPress: () => void }) {
   const cooldown = getCooldownInfo(item);
+  const imageUrl = getItemImageUrl(item);
   const typeColors: Record<string, string> = {
     lifeCard: C.accent,
     nudge: C.slate,
@@ -36,34 +45,62 @@ function ItemCard({ item, onPress }: { item: ActiveItem; onPress: () => void }) 
         pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
       ]}
     >
-      <View style={styles.cardHeader}>
-        <View style={[styles.typeBadge, { backgroundColor: tagColor }]}>
-          <Text style={styles.typeBadgeText}>{getTypeLabel(item.type)}</Text>
+      <View style={styles.cardRow}>
+        <View style={[styles.thumbWrap, { backgroundColor: tagColor + "20" }]}>
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.cardThumb}
+              contentFit="cover"
+            />
+          ) : (
+            <Ionicons
+              name={TYPE_ICONS[item.type] ?? "document"}
+              size={28}
+              color={tagColor}
+            />
+          )}
         </View>
-        {cooldown.isCoolingDown && (
-          <View style={styles.cooldownBadge}>
-            <Ionicons name="time-outline" size={12} color={C.warning} />
-            <Text style={styles.cooldownText}>
-              {cooldown.remainingDays}日
-            </Text>
+        <View style={styles.cardBody}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.typeBadge, { backgroundColor: tagColor }]}>
+              <Text style={styles.typeBadgeText}>{getTypeLabel(item.type)}</Text>
+            </View>
+            {cooldown.isCoolingDown && (
+              <View style={styles.cooldownBadge}>
+                <Ionicons name="time-outline" size={12} color={C.warning} />
+                <Text style={styles.cooldownText}>
+                  {cooldown.remainingDays}日
+                </Text>
+              </View>
+            )}
           </View>
-        )}
-      </View>
-      <Text style={styles.cardMainText} numberOfLines={2}>
-        {getItemMainText(item)}
-      </Text>
-      <View style={styles.cardStats}>
-        <View style={styles.statItem}>
-          <Ionicons name="checkmark-circle" size={14} color={C.success} />
-          <Text style={styles.statText}>{item.stats.yesCount}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Ionicons name="close-circle" size={14} color={C.danger} />
-          <Text style={styles.statText}>{item.stats.noCount}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Ionicons name="remove-circle" size={14} color={C.skip} />
-          <Text style={styles.statText}>{item.stats.skipCount}</Text>
+          <Text style={styles.cardMainText} numberOfLines={2}>
+            {getItemMainText(item)}
+          </Text>
+          {getItemTags(item).length > 0 && (
+            <View style={styles.cardTags}>
+              {getItemTags(item).map((tag) => (
+                <View key={tag} style={styles.tagChip}>
+                  <Text style={styles.tagChipText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <View style={styles.cardStats}>
+            <View style={styles.statItem}>
+              <Ionicons name="checkmark-circle" size={14} color={C.success} />
+              <Text style={styles.statText}>{item.stats.yesCount}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="close-circle" size={14} color={C.danger} />
+              <Text style={styles.statText}>{item.stats.noCount}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="remove-circle" size={14} color={C.skip} />
+              <Text style={styles.statText}>{item.stats.skipCount}</Text>
+            </View>
+          </View>
         </View>
       </View>
     </Pressable>
@@ -74,6 +111,16 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { activeItems, isLoading, simulateDelivery, getLastDelivery } =
     useApp();
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  const allTags = useMemo(
+    () => [...new Set(activeItems.flatMap((i) => getItemTags(i)))].sort(),
+    [activeItems]
+  );
+  const filteredItems =
+    selectedTag === null
+      ? activeItems
+      : activeItems.filter((i) => getItemTags(i).includes(selectedTag));
 
   const handleSimulate = async () => {
     const { item, delivery } = await simulateDelivery();
@@ -146,14 +193,59 @@ export default function HomeScreen() {
         )}
       </View>
 
+      {allTags.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={styles.filterScroll}
+        >
+          <Pressable
+            style={[
+              styles.filterChip,
+              selectedTag === null && styles.filterChipActive,
+            ]}
+            onPress={() => setSelectedTag(null)}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                selectedTag === null && styles.filterChipTextActive,
+              ]}
+            >
+              すべて
+            </Text>
+          </Pressable>
+          {allTags.map((tag) => (
+            <Pressable
+              key={tag}
+              style={[
+                styles.filterChip,
+                selectedTag === tag && styles.filterChipActive,
+              ]}
+              onPress={() => setSelectedTag(tag)}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  selectedTag === tag && styles.filterChipTextActive,
+                ]}
+              >
+                {tag}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
       <FlatList
-        data={activeItems}
+        data={filteredItems}
         keyExtractor={(it) => it.id}
         renderItem={({ item }) => (
           <ItemCard
             item={item}
             onPress={() =>
-              router.push({ pathname: "/edit", params: { id: item.id } })
+              router.push({ pathname: "/view", params: { id: item.id } })
             }
           />
         )}
@@ -163,10 +255,14 @@ export default function HomeScreen() {
           <View style={styles.empty}>
             <Feather name="inbox" size={48} color={C.textMuted} />
             <Text style={styles.emptyText}>
-              まだアイテムがありません
+              {selectedTag === null
+                ? "まだアイテムがありません"
+                : `「${selectedTag}」のアイテムはありません`}
             </Text>
             <Text style={styles.emptySubText}>
-              下の「追加」ボタンから始めましょう
+              {selectedTag === null
+                ? "下の「追加」ボタンから始めましょう"
+                : "タグを変えるか、アイテムにタグを付けましょう"}
             </Text>
           </View>
         }
@@ -245,6 +341,37 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 4,
   },
+  filterScroll: {
+    maxHeight: 44,
+    marginBottom: 8,
+  },
+  filterRow: {
+    paddingHorizontal: 20,
+    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 40,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: C.cardBg,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  filterChipActive: {
+    backgroundColor: C.accent,
+    borderColor: C.accent,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontFamily: "NotoSansJP_500Medium",
+    color: C.textSecondary,
+  },
+  filterChipTextActive: {
+    color: "#fff",
+  },
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -283,6 +410,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.borderLight,
   },
+  cardRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  thumbWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  cardThumb: {
+    width: "100%",
+    height: "100%",
+  },
+  cardBody: {
+    flex: 1,
+    minWidth: 0,
+  },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -319,6 +466,23 @@ const styles = StyleSheet.create({
     color: C.textPrimary,
     lineHeight: 22,
     marginBottom: 10,
+  },
+  cardTags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 10,
+  },
+  tagChip: {
+    backgroundColor: C.borderLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  tagChipText: {
+    fontSize: 11,
+    fontFamily: "NotoSansJP_500Medium",
+    color: C.textSecondary,
   },
   cardStats: {
     flexDirection: "row",

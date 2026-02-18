@@ -38,11 +38,13 @@ interface AppContextValue {
 
   addItem: (
     type: ItemType,
-    content: LifeCardContent | NudgeContent | PlaybookContent
+    content: LifeCardContent | NudgeContent | PlaybookContent,
+    tags?: string[]
   ) => Promise<ActiveItem>;
   updateItem: (
     id: string,
-    content: LifeCardContent | NudgeContent | PlaybookContent
+    content: LifeCardContent | NudgeContent | PlaybookContent,
+    tags?: string[]
   ) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   permanentDelete: (id: string) => Promise<void>;
@@ -50,7 +52,8 @@ interface AppContextValue {
   replaceAndAdd: (
     oldId: string,
     type: ItemType,
-    content: LifeCardContent | NudgeContent | PlaybookContent
+    content: LifeCardContent | NudgeContent | PlaybookContent,
+    tags?: string[]
   ) => Promise<ActiveItem>;
   replaceAndRestore: (oldId: string, restoreId: string) => Promise<ActiveItem | null>;
   simulateDelivery: () => Promise<{
@@ -114,7 +117,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addItem = useCallback(
     async (
       type: ItemType,
-      content: LifeCardContent | NudgeContent | PlaybookContent
+      content: LifeCardContent | NudgeContent | PlaybookContent,
+      tags?: string[]
     ): Promise<ActiveItem> => {
       const newItem: ActiveItem = {
         id: generateId(),
@@ -123,6 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updatedAt: Date.now(),
         stats: { yesCount: 0, noCount: 0, skipCount: 0, displayCount: 0 },
         content,
+        tags: tags && tags.length > 0 ? tags : undefined,
       };
       await updateAndSave((prev) => ({
         ...prev,
@@ -134,11 +139,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const updateItem = useCallback(
-    async (id: string, content: LifeCardContent | NudgeContent | PlaybookContent) => {
+    async (
+      id: string,
+      content: LifeCardContent | NudgeContent | PlaybookContent,
+      tags?: string[]
+    ) => {
       await updateAndSave((prev) => ({
         ...prev,
         activeItems: prev.activeItems.map((it) =>
-          it.id === id ? { ...it, content, updatedAt: Date.now() } : it
+          it.id === id
+            ? {
+                ...it,
+                content,
+                updatedAt: Date.now(),
+                tags: tags && tags.length > 0 ? tags : undefined,
+              }
+            : it
         ),
       }));
     },
@@ -197,7 +213,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (
       oldId: string,
       type: ItemType,
-      content: LifeCardContent | NudgeContent | PlaybookContent
+      content: LifeCardContent | NudgeContent | PlaybookContent,
+      tags?: string[]
     ): Promise<ActiveItem> => {
       const newItem: ActiveItem = {
         id: generateId(),
@@ -206,6 +223,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updatedAt: Date.now(),
         stats: { yesCount: 0, noCount: 0, skipCount: 0, displayCount: 0 },
         content,
+        tags: tags && tags.length > 0 ? tags : undefined,
       };
       await updateAndSave((prev) => {
         const oldItem = prev.activeItems.find((it) => it.id === oldId);

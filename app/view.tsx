@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React from "react";
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   Platform,
-  Alert,
   ScrollView,
 } from "react-native";
 import { Image } from "expo-image";
@@ -20,90 +19,50 @@ import Colors from "@/constants/colors";
 
 const C = Colors.light;
 
-export default function DoomScreen() {
+const typeColors: Record<string, [string, string]> = {
+  lifeCard: [C.accent, "#C53030"],
+  nudge: [C.slate, C.deepNavy],
+  playbook: [C.deepNavy, C.ink],
+};
+
+export default function ViewScreen() {
   const insets = useSafeAreaInsets();
-  const { deliveryId } = useLocalSearchParams<{ deliveryId: string }>();
-  const { activeItems, deliveries, recordFeedback, deleteItem, reduceNoCount } = useApp();
-  const [feedbackGiven, setFeedbackGiven] = useState(false);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { activeItems } = useApp();
 
-  const delivery = useMemo(
-    () => deliveries.find((d) => d.id === deliveryId) || null,
-    [deliveries, deliveryId]
-  );
-  const item = useMemo(
-    () =>
-      delivery
-        ? activeItems.find((it) => it.id === delivery.itemId) || null
-        : null,
-    [activeItems, delivery]
-  );
-
+  const item = activeItems.find((it) => it.id === id);
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
-  if (!delivery || !item) {
+  if (!item) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+      <View style={styles.container}>
         <LinearGradient
           colors={[C.ink, C.deepNavy]}
           style={StyleSheet.absoluteFill}
         />
-        <Pressable style={styles.closeBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/")}>
-          <Ionicons name="close" size={28} color="#fff" />
+        <Pressable
+          style={[
+            styles.backBtn,
+            {
+              position: "absolute",
+              left: 20,
+              top: insets.top + webTopInset + 12,
+              zIndex: 10,
+            },
+          ]}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+          hitSlop={12}
+        >
+          <Ionicons name="arrow-back" size={28} color="rgba(255,255,255,0.8)" />
         </Pressable>
-        <Text style={styles.noItemText}>配信アイテムがありません</Text>
+        <Text style={[styles.noItemText, { marginTop: insets.top + webTopInset + 80 }]}>
+          アイテムが見つかりません
+        </Text>
       </View>
     );
   }
 
-  const showFeedback =
-    delivery.feedbackAsked && !delivery.feedbackGiven && !feedbackGiven;
-
-  const handleFeedback = async (feedback: "YES" | "NO" | "SKIP") => {
-    const result = await recordFeedback(delivery.id, feedback);
-    setFeedbackGiven(true);
-
-    if (feedback === "NO" && result.shouldPromptDelete) {
-      if (Platform.OS === "web") {
-        if (confirm("NOが5回になりました。このアイテムを削除しますか？")) {
-          await deleteItem(item.id);
-          if (router.canGoBack()) router.back();
-          else router.replace("/");
-        } else {
-          await reduceNoCount(item.id);
-        }
-      } else {
-        Alert.alert(
-          "削除しますか？",
-          "NOが5回になりました。このアイテムを削除ボックスに移動しますか？",
-          [
-            {
-              text: "削除しない",
-              style: "cancel",
-              onPress: async () => {
-                await reduceNoCount(item.id);
-              },
-            },
-            {
-              text: "削除する",
-              style: "destructive",
-              onPress: async () => {
-                await deleteItem(item.id);
-                if (router.canGoBack()) router.back();
-                else router.replace("/");
-              },
-            },
-          ]
-        );
-      }
-    }
-  };
-
-  const typeColors: Record<string, [string, string]> = {
-    lifeCard: [C.accent, "#C53030"],
-    nudge: [C.slate, C.deepNavy],
-    playbook: [C.deepNavy, C.ink],
-  };
-  const gradientColors = typeColors[item.type] || [C.accent, C.ink];
+  const gradientColors = typeColors[item.type] ?? [C.accent, C.ink];
 
   return (
     <View style={styles.container}>
@@ -121,11 +80,11 @@ export default function DoomScreen() {
         ]}
       >
         <Pressable
-          style={styles.closeBtn}
-          onPress={() => router.canGoBack() ? router.back() : router.replace("/")}
+          style={styles.backBtn}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
           hitSlop={12}
         >
-          <Ionicons name="close" size={28} color="rgba(255,255,255,0.8)" />
+          <Ionicons name="arrow-back" size={28} color="rgba(255,255,255,0.8)" />
         </Pressable>
         <View style={styles.typeLabelWrap}>
           <Text style={styles.typeLabel}>{getTypeLabel(item.type)}</Text>
@@ -139,7 +98,7 @@ export default function DoomScreen() {
           styles.mainContentInner,
           {
             paddingBottom:
-              insets.bottom + (Platform.OS === "web" ? 34 : 0) + 120,
+              insets.bottom + (Platform.OS === "web" ? 34 : 0) + 100,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -155,56 +114,24 @@ export default function DoomScreen() {
         )}
       </ScrollView>
 
-      {showFeedback && (
-        <View
-          style={[
-            styles.feedbackBar,
-            {
-              paddingBottom:
-                insets.bottom + (Platform.OS === "web" ? 34 : 0) + 16,
-            },
-          ]}
+      <View
+        style={[
+          styles.editBar,
+          {
+            paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0) + 16,
+          },
+        ]}
+      >
+        <Pressable
+          style={styles.editBtn}
+          onPress={() =>
+            router.push({ pathname: "/edit", params: { id: item.id } })
+          }
         >
-          <Text style={styles.feedbackQuestion}>役に立った？</Text>
-          <View style={styles.feedbackButtons}>
-            <Pressable
-              style={[styles.fbBtn, { backgroundColor: "rgba(52,211,153,0.2)" }]}
-              onPress={() => handleFeedback("YES")}
-            >
-              <Ionicons name="checkmark-circle" size={28} color={C.success} />
-              <Text style={[styles.fbBtnText, { color: C.success }]}>YES</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.fbBtn, { backgroundColor: "rgba(148,163,184,0.2)" }]}
-              onPress={() => handleFeedback("SKIP")}
-            >
-              <Ionicons name="remove-circle" size={28} color="#CBD5E1" />
-              <Text style={[styles.fbBtnText, { color: "#CBD5E1" }]}>SKIP</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.fbBtn, { backgroundColor: "rgba(239,68,68,0.2)" }]}
-              onPress={() => handleFeedback("NO")}
-            >
-              <Ionicons name="close-circle" size={28} color={C.danger} />
-              <Text style={[styles.fbBtnText, { color: C.danger }]}>NO</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-
-      {feedbackGiven && (
-        <View
-          style={[
-            styles.feedbackBar,
-            {
-              paddingBottom:
-                insets.bottom + (Platform.OS === "web" ? 34 : 0) + 16,
-            },
-          ]}
-        >
-          <Text style={styles.thankYouText}>回答ありがとう！</Text>
-        </View>
-      )}
+          <Ionicons name="pencil" size={20} color="#fff" />
+          <Text style={styles.editBtnText}>編集</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -288,7 +215,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     zIndex: 10,
   },
-  closeBtn: {
+  backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -378,46 +305,30 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.9)",
     lineHeight: 26,
   },
-  feedbackBar: {
+  editBar: {
     position: "absolute" as const,
     bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: 20,
+    paddingTop: 16,
     paddingHorizontal: 28,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.25)",
   },
-  feedbackQuestion: {
-    fontSize: 16,
-    fontFamily: "NotoSansJP_700Bold",
-    color: "#fff",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  feedbackButtons: {
+  editBtn: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 16,
-  },
-  fbBtn: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingVertical: 14,
+    gap: 8,
+    paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 16,
-    minWidth: 80,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
-  fbBtnText: {
-    fontSize: 13,
-    fontFamily: "NotoSansJP_700Bold",
-  },
-  thankYouText: {
-    fontSize: 16,
+  editBtnText: {
+    fontSize: 15,
     fontFamily: "NotoSansJP_500Medium",
-    color: "rgba(255,255,255,0.8)",
-    textAlign: "center",
-    paddingBottom: 10,
+    color: "#fff",
   },
   noItemText: {
     fontSize: 16,

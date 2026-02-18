@@ -8,11 +8,15 @@ export interface LifeCardContent {
 
 export interface NudgeContent {
   text: string;
+  /** 画像（任意）。一覧サムネイル・表示画面で使用。 */
+  imageUrl?: string;
 }
 
 export interface PlaybookContent {
   title: string;
   steps: string[];
+  /** 画像（任意）。一覧サムネイル・表示画面で使用。 */
+  imageUrl?: string;
 }
 
 export interface ItemStats {
@@ -30,6 +34,8 @@ export interface ActiveItem {
   updatedAt: number;
   stats: ItemStats;
   content: LifeCardContent | NudgeContent | PlaybookContent;
+  /** タグ（カテゴリ）。任意。未設定は [] として扱う。 */
+  tags?: string[];
 }
 
 export interface DeleteBoxItem extends ActiveItem {
@@ -79,5 +85,22 @@ export function getTypeLabel(type: ItemType): string {
     case "lifeCard": return "Life Card";
     case "nudge": return "Nudge";
     case "playbook": return "Playbook";
+  }
+}
+
+/** アイテムのタグ一覧。未設定は空配列。 */
+export function getItemTags(item: ActiveItem): string[] {
+  return item.tags ?? [];
+}
+
+/** 一覧サムネイル用。画像があれば URL、なければ undefined。 */
+export function getItemImageUrl(item: ActiveItem): string | undefined {
+  switch (item.type) {
+    case "lifeCard":
+      return (item.content as LifeCardContent).imageUrl;
+    case "nudge":
+      return (item.content as NudgeContent).imageUrl;
+    case "playbook":
+      return (item.content as PlaybookContent).imageUrl;
   }
 }

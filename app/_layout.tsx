@@ -27,6 +27,7 @@ function RootLayoutNav() {
       <Stack.Screen name="index" />
       <Stack.Screen name="add" />
       <Stack.Screen name="edit" />
+      <Stack.Screen name="view" />
       <Stack.Screen name="doom" options={{ animation: "fade" }} />
       <Stack.Screen name="settings" />
       <Stack.Screen name="delete-box" />
