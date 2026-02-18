@@ -5,10 +5,15 @@ import {
   StyleSheet,
   Pressable,
   Platform,
+  Alert,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useApp } from "@/lib/AppContext";
+import { selectTodayItem, getTodayDateString, buildWidgetPayload } from "@/lib/widget";
+import { getTypeLabel } from "@/lib/types";
 import Colors from "@/constants/colors";
 
 const C = Colors.light;
@@ -16,6 +21,26 @@ const C = Colors.light;
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const { activeItems } = useApp();
+
+  const handleWidgetCheck = () => {
+    const today = getTodayDateString();
+    const item = selectTodayItem(activeItems, today);
+    if (!item) {
+      Alert.alert("今日の1枚（確認）", "アイテムがありません。");
+      return;
+    }
+    const payload = buildWidgetPayload(item);
+    const lines = [
+      `日付: ${today}`,
+      `選ばれた1件: ${getTypeLabel(item.type)}`,
+      `phrase: ${payload.phrase.slice(0, 30)}${payload.phrase.length > 30 ? "…" : ""}`,
+      payload.title ? `title: ${payload.title.slice(0, 20)}…` : "title: （なし）",
+      payload.imageUri ? "画像: あり" : "画像: なし",
+      `updatedAt: ${payload.updatedAt}`,
+    ];
+    Alert.alert("今日の1枚（確認）", lines.join("\n"));
+  };
 
   return (
     <View
@@ -35,6 +60,11 @@ export default function SettingsScreen() {
         <View style={{ width: 24 }} />
       </View>
 
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>通知スケジュール</Text>
         <View style={styles.scheduleCard}>
@@ -88,9 +118,21 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>ウィジェット（開発用）</Text>
+        <Pressable style={styles.widgetCheckBtn} onPress={handleWidgetCheck}>
+          <Ionicons name="phone-portrait-outline" size={20} color={C.accent} />
+          <Text style={styles.widgetCheckBtnText}>今日の1枚を確認</Text>
+        </Pressable>
+        <Text style={styles.scheduleNote}>
+          同じ日付なら常に同じ1件が選ばれます。複数回タップして同じ結果になるか確認できます。
+        </Text>
+      </View>
+
       <View style={styles.footer}>
         <Text style={styles.version}>Life Hack Reminder v1.0</Text>
       </View>
+      </ScrollView>
     </View>
   );
 }
@@ -111,6 +153,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: "NotoSansJP_700Bold",
     color: C.ink,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
   },
   section: {
     paddingHorizontal: 20,
@@ -177,10 +225,25 @@ const styles = StyleSheet.create({
     fontFamily: "NotoSansJP_500Medium",
     color: C.textPrimary,
   },
-  footer: {
-    flex: 1,
-    justifyContent: "flex-end",
+  widgetCheckBtn: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 10,
+    backgroundColor: C.cardBg,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  widgetCheckBtnText: {
+    fontSize: 15,
+    fontFamily: "NotoSansJP_500Medium",
+    color: C.accent,
+  },
+  footer: {
+    alignItems: "center",
+    paddingTop: 24,
     paddingBottom: 20,
   },
   version: {

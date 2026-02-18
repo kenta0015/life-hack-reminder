@@ -8,6 +8,7 @@ import React, {
   useRef,
   type ReactNode,
 } from "react";
+import { AppState as RNAppState } from "react-native";
 import type {
   ActiveItem,
   DeleteBoxItem,
@@ -25,6 +26,12 @@ import {
   createDeliveryRecord,
   generateId,
 } from "./delivery";
+import {
+  selectTodayItem,
+  getTodayDateString,
+  buildWidgetPayload,
+} from "./widget";
+import { writeWidgetDataToNative } from "./widgetNative";
 
 const DELETE_BOX_RETENTION_MS = 30 * 86400000;
 
@@ -86,6 +93,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     latestStateRef.current = state;
   }, [state]);
 
+  function syncWidgetData(activeItems: ActiveItem[]) {
+    const today = getTodayDateString();
+    const item = selectTodayItem(activeItems, today);
+    if (item) {
+      const payload = buildWidgetPayload(item);
+      writeWidgetDataToNative(payload).catch(() => {});
+    }
+  }
+
   useEffect(() => {
     loadState().then((s) => {
       const cleaned = cleanDeleteBox(s);
@@ -93,7 +109,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       latestStateRef.current = cleaned;
       setIsLoading(false);
       saveState(cleaned);
+      syncWidgetData(cleaned.activeItems);
     });
+  }, []);
+
+  useEffect(() => {
+    const sub = RNAppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        syncWidgetData(latestStateRef.current.activeItems);
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   const updateAndSave = useCallback(async (updater: (prev: AppState) => AppState): Promise<AppState> => {
@@ -103,6 +129,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     latestStateRef.current = nextCleaned;
     setState(nextCleaned);
     await saveState(nextCleaned);
+    syncWidgetData(nextCleaned.activeItems);
     return nextCleaned;
   }, []);
 

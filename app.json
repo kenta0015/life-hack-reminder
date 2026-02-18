@@ -15,7 +15,13 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.myapp"
+      "bundleIdentifier": "com.kenta0015.life-hack-reminder",
+      "appleTeamId": "K8G5D32BFP",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.kenta0015.life-hack-reminder"
+        ]
+      }
     },
     "android": {
       "package": "com.myapp",
@@ -37,7 +43,8 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,

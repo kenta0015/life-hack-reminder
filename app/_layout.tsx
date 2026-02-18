@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -15,6 +15,8 @@ import {
 } from "@expo-google-fonts/noto-sans-jp";
 
 SplashScreen.preventAutoHideAsync();
+
+const SPLASH_TIMEOUT_MS = 4000;
 
 function RootLayoutNav() {
   return (
@@ -42,14 +44,24 @@ export default function RootLayout() {
     NotoSansJP_500Medium,
     NotoSansJP_700Bold,
   });
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
+    if (fontsLoaded) setReady(true);
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), SPLASH_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (ready) {
+      SplashScreen.hideAsync();
+    }
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
     <ErrorBoundary>
