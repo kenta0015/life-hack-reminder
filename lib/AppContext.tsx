@@ -32,6 +32,7 @@ import {
   buildWidgetPayload,
 } from "./widget";
 import { writeWidgetDataToNative } from "./widgetNative";
+import { scheduleTodayOneShot } from "./notificationSchedule";
 
 const DELETE_BOX_RETENTION_MS = 30 * 86400000;
 
@@ -110,13 +111,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       saveState(cleaned);
       syncWidgetData(cleaned.activeItems);
+      scheduleTodayOneShot(cleaned.activeItems).catch(() => {});
     });
   }, []);
 
   useEffect(() => {
     const sub = RNAppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
-        syncWidgetData(latestStateRef.current.activeItems);
+        const items = latestStateRef.current.activeItems;
+        syncWidgetData(items);
+        scheduleTodayOneShot(items).catch(() => {});
       }
     });
     return () => sub.remove();

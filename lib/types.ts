@@ -58,6 +58,21 @@ export interface AppState {
   lastDeliveryId?: string;
 }
 
+/**
+ * 通知スケジュール用の簡易モデル（ステップ3〜4）。
+ * Phase 1 の「月・水・金 9:00」は別レイヤとして、将来的にこのモデルで表現する想定。
+ */
+export interface NotificationSchedule {
+  id: string;
+  /** 0–23 */
+  hour: number;
+  /** 0–59 */
+  minute: number;
+  /** 1=日 … 7=土。空なら「毎日」の解釈も可 */
+  weekdays: number[];
+  enabled: boolean;
+}
+
 export function getItemTitle(item: ActiveItem): string {
   switch (item.type) {
     case "lifeCard":

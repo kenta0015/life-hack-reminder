@@ -8,16 +8,29 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import * as Notifications from "expo-notifications";
 import { useApp } from "@/lib/AppContext";
 import { getItemMainText, getTypeLabel, getItemTags, getItemImageUrl } from "@/lib/types";
 import { getCooldownInfo } from "@/lib/delivery";
 import type { ActiveItem } from "@/lib/types";
 import Colors from "@/constants/colors";
+
+// フォアグラウンドでも通知を表示する（実機テスト用）
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 const C = Colors.light;
 
@@ -112,6 +125,7 @@ export default function HomeScreen() {
   const { activeItems, isLoading, simulateDelivery, getLastDelivery } =
     useApp();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [testNotifScheduling, setTestNotifScheduling] = useState(false);
 
   const allTags = useMemo(
     () => [...new Set(activeItems.flatMap((i) => getItemTags(i)))].sort(),
@@ -139,6 +153,47 @@ export default function HomeScreen() {
         pathname: "/doom",
         params: { deliveryId: delivery.id },
       });
+    }
+  };
+
+  const handleTestNotification = async () => {
+    if (Platform.OS === "web") return;
+    setTestNotifScheduling(true);
+    try {
+      const targetItem = activeItems[0];
+      const { status: existing } = await Notifications.getPermissionsAsync();
+      let status = existing;
+      if (existing !== "granted") {
+        const { status: requested } = await Notifications.requestPermissionsAsync();
+        status = requested;
+      }
+      if (status !== "granted") {
+        Alert.alert(
+          "通知が許可されていません",
+          "設定アプリから「Life Hack Reminder」の通知をオンにしてください。"
+        );
+        setTestNotifScheduling(false);
+        return;
+      }
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Life Hack Reminder",
+          body: "テスト通知です。実機で届いていればOKです。",
+          data: targetItem ? { itemId: targetItem.id } : {},
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 10,
+        },
+      });
+      Alert.alert(
+        "テスト通知を予約しました",
+        "10秒後に通知が届きます。アプリを閉じたりバックグラウンドにしても届きます。"
+      );
+    } catch (e) {
+      Alert.alert("エラー", e instanceof Error ? e.message : "通知の予約に失敗しました。");
+    } finally {
+      setTestNotifScheduling(false);
     }
   };
 
@@ -192,6 +247,24 @@ export default function HomeScreen() {
           </Pressable>
         )}
       </View>
+      {Platform.OS !== "web" && (
+        <View style={styles.actionRow}>
+          <Pressable
+            style={[styles.actionBtn, styles.actionBtnSecondary]}
+            onPress={handleTestNotification}
+            disabled={testNotifScheduling}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={18}
+              color={C.accent}
+            />
+            <Text style={styles.actionBtnTextSecondary}>
+              {testNotifScheduling ? "予約中…" : "テスト通知（10秒後）"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       {allTags.length > 0 && (
         <ScrollView

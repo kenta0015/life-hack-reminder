@@ -19,7 +19,6 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
-    "expo-widget-bridge": "file:./modules/expo-widget-bridge",
     "@expo-google-fonts/noto-sans-jp": "^0.4.3",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -41,12 +40,14 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.10",
     "expo-location": "~19.0.8",
+    "expo-notifications": "~0.32.16",
     "expo-router": "~6.0.17",
     "expo-splash-screen": "~31.0.12",
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.10",
+    "expo-widget-bridge": "file:./modules/expo-widget-bridge",
     "express": "^5.0.1",
     "http-proxy-middleware": "^3.0.5",
     "pg": "^8.16.3",

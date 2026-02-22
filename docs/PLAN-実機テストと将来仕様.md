@@ -73,15 +73,28 @@ Phase 1 ができたあと、必要に応じて次の順で検討する。**ま�
 
 | 順番 | 項目 | 仕様の位置づけ | 実装方針（いつかやる場合） |
 |------|------|----------------|----------------------------|
-| 1 | **本物のローカル通知** | プロトタイプでは手動トリガーでOK。将来「月・水・金 9:00」等で本当に通知を飛ばす。 | `expo-notifications` を入れ、**Development Build（または EAS Build）** が必須。Expo Go だけでは実通知は制限される。 |
+| 1 | **本物のローカル通知** | プロトタイプでは手動トリガーでOK。将来「月・水・金 9:00」等で本当に通知を飛ばす。 | **Development Build（または EAS Build）が必須**。Expo Go だけでは実通知は制限される。※ ステップ1で `expo-notifications` を導入済み（`app.json` の `plugins` に追加）。 |
 | 2 | **ホーム画面ウィジェット（画像ドーン）** | 仕様「将来」。アプリを開かずにホームで想起。 | 公式 expo-widgets は未使用。**@bittingz/expo-widgets** または **@bacons/apple-targets** で Swift ウィジェット＋App Group を想定。詳細は [調査-ホーム画面ウィジェット.md](./調査-ホーム画面ウィジェット.md) を参照。 |
 | 3 | **タグ/カテゴリ** | プロトタイプでは不要。 | データモデル（Life Card / Nudge / Playbook に `tags` 等）と一覧・フィルタUIの追加。通知・ウィジェットよりは実装難易度は低いが、仕様上後回しでよい。 |
 
 ### 依存関係の整理
 
-- **ローカル通知**: 実機で「本当に通知が来る」を試すには、Expo Go を卒業して **Development Build** を作成する必要がある。
+- **ローカル通知**: 実機で「本当に通知が来る」を試すには、Expo Go を卒業して **Development Build**（または EAS Build）を作成する必要がある。Expo Go では実通知は制限される。
 - **ウィジェット**: 同じくネイティブ（Widget Extension）が必要なので、Development Build / EAS Build が前提。
 - **タグ/カテゴリ**: ネイティブ必須ではない。アプリのデータとUIの拡張だけで対応可能。
+
+**本物のローカル通知を試す場合**: **Development Build（または EAS Build）が必須**。Expo Go では実通知は制限される。ステップ1で `expo-notifications` を導入済み（`app.json` の `plugins` に追加）。ホーム画面に「**テスト通知（10秒後）**」ボタンを追加済み。実機で以下を実行すると通知が届くか確認できる。
+
+#### ローカル通知の実機テスト手順（方法B）
+
+1. **prebuild でネイティブを更新**  
+   プロジェクト直下で `npx expo prebuild --clean` を実行。expo-notifications の権限などが `ios/` に反映される。既存の `ios/.xcode.env.updates` などカスタムがある場合は prebuild 後に必要に応じて再設定。
+
+2. **Xcode で実機ビルド**  
+   `ios/LifeHackReminder.xcworkspace` を Xcode で開く。Signing & Capabilities で Team を設定し、実機を選んで Run。Metro は別ターミナルで `npm start` を実行しておく（実機用に `ios/.xcode.env.updates` で `unset SKIP_BUNDLING` 等を設定している場合はそのまま）。
+
+3. **アプリでテスト**  
+   ホーム画面の「**テスト通知（10秒後）**」をタップ。初回は通知の許可を求められるので「許可」。約10秒後に「Life Hack Reminder / テスト通知です…」が届けばOK。アプリを閉じたりバックグラウンドにしても届く。
 
 そのため、**実装するなら** 論理的な順序は:
 

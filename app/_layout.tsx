@@ -1,9 +1,10 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import * as Notifications from "expo-notifications";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { AppProvider } from "@/lib/AppContext";
@@ -59,6 +60,26 @@ export default function RootLayout() {
     if (ready) {
       SplashScreen.hideAsync();
     }
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const sub = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as
+          | { itemId?: string }
+          | undefined;
+        const itemId = data?.itemId;
+        if (itemId) {
+          router.push({ pathname: "/view", params: { id: String(itemId) } });
+        } else {
+          router.push("/");
+        }
+      }
+    );
+    return () => {
+      sub.remove();
+    };
   }, [ready]);
 
   if (!ready) return null;
