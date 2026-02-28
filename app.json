@@ -17,10 +17,15 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.kenta0015.life-hack-reminder",
       "appleTeamId": "K8G5D32BFP",
+      "buildNumber": "3",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.kenta0015.life-hack-reminder"
         ]
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Life Hack Reminder uses your photo library so you can choose an image for your Life Cards—the reminder cards that show your chosen photo and message when you receive a notification. For example, you might select a motivating picture or a photo from a meaningful moment to display on your card."
       }
     },
     "android": {
@@ -50,6 +55,31 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://replit.com/"
+      },
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.kenta0015.life-hack-reminder.widget",
+                  "targetName": "LifeHackWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.kenta0015.life-hack-reminder"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "eb3233c1-62f4-4a11-8f3e-846f243bb081"
+      }
     }
   }
 }
