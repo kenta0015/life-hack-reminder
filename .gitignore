@@ -9,9 +9,10 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
-ios/
-android/
+# Native (root only; local module ios/ must be uploaded for EAS)
+/ios/
+/android/
+!modules/expo-widget-bridge/ios/
 *.orig.*
 *.jks
 *.p8
